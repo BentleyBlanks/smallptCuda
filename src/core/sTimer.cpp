@@ -1,4 +1,4 @@
-#include <t3Timer.h>
+#include <core/sTimer.h>
 //#include <Common/t3Test.h>
 
 // --!参考于http://nadeausoftware.com/articles/2012/04/c_c_tip_how_measure_elapsed_real_time_benchmarking
@@ -98,7 +98,7 @@ double t3GetRealTime( )
 }
 
 // 开始计时
-double t3Timer::start()
+double sTimer::start()
 {
     startTime = t3GetRealTime();
     
@@ -106,14 +106,14 @@ double t3Timer::start()
 }
 
 // 结束计时
-double t3Timer::end()
+double sTimer::end()
 {
     endTime = t3GetRealTime();
     
     return endTime;
 }
 
-double t3Timer::difference()
+double sTimer::difference()
 {
     return endTime - startTime;
 }

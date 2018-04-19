@@ -14,15 +14,15 @@
     <CudaCompile Include="..\..\src\main.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\t3Timer.cpp" />
+    <None Include="..\..\src\image\svpng.inc" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\a3Random.h" />
-    <ClInclude Include="..\..\src\cutil_math.h" />
-    <ClInclude Include="..\..\src\t3Timer.h" />
+    <ClInclude Include="..\..\src\core\helper_math.h" />
+    <ClInclude Include="..\..\src\core\sRandom.h" />
+    <ClInclude Include="..\..\src\core\sTimer.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\src\svpng.inc" />
+    <ClCompile Include="..\..\src\core\sTimer.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F89AF8D1-8CE2-4857-90AB-725F6630D35E}</ProjectGuid>

@@ -1,10 +1,10 @@
 ﻿#ifndef T3_TIMER_H
 #define T3_TIMER_H
 
-class t3Timer
+class sTimer
 {
 public:
-    t3Timer():startTime(0.0f){}
+    sTimer():startTime(0.0f){}
     
     // 开始计时
     double start();
