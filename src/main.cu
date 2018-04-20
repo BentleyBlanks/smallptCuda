@@ -92,9 +92,10 @@ __device__ float3 radiance(Ray &r, curandState* rs)
 {
     float3 L = make_float3(0.0f, 0.0f, 0.0f); // accumulates ray colour with each iteration through bounce loop
     float3 throughput = make_float3(1.0f, 1.0f, 1.0f);
+    int depth = 0;
 
     // ray bounce loop
-    for(int depth = 0; depth < 6; depth++)
+    while(1)
     {
         float t;    
         int id = 0;         
@@ -185,13 +186,13 @@ __device__ float3 radiance(Ray &r, curandState* rs)
         }
 
         // Russian roulette Stop with at least some probability to avoid getting stuck
-        //if(depth++ >= 5)
-        //{
-        //    float q = min(0.95f, rgbToLuminance(throughput));
-        //    if(curand_uniform(rs) >= q)
-        //        break;
-        //    throughput /= q;
-        //}
+        if(depth++ >= 5)
+        {
+            float q = min(0.95f, rgbToLuminance(throughput));
+            if(curand_uniform(rs) >= q)
+                break;
+            throughput /= q;
+        }
     }
 
     return L;
@@ -222,7 +223,7 @@ __global__ void render(int spp, int width, int height, float3* output)
         float3 d = cam.direction + cx*((.25 + x) / width - .5) + cy*((.25 + y) / height - .5);
 
         Ray tRay = Ray(cam.origin + d * 140, normalize(d));
-        color += radiance(tRay, &rs) * (1.0f / spp);
+        color += radiance(tRay, &rs) *(1.0f / spp);
     }
 
     // output to the cache
