@@ -221,7 +221,8 @@ __global__ void render(int spp, int width, int height, float3* output)
         //--! could be super sampling
         float3 d = cam.direction + cx*((.25 + x) / width - .5) + cy*((.25 + y) / height - .5);
 
-        color += radiance(Ray(cam.origin + d * 140, normalize(d)), &rs)*(1.0f / spp);
+        Ray tRay = Ray(cam.origin + d * 140, normalize(d));
+        color += radiance(tRay, &rs) * (1.0f / spp);
     }
 
     // output to the cache
@@ -233,6 +234,7 @@ int toInt(float x)
 {
     return (int) (pow(clamp(x, 0.0f, 1.0f), 1.0f / 2.2f) * 255 + 0.5f);
 }
+
 void save(const char* fileName, int width, int height, float3* data)
 {
     FILE *fp = fopen(fileName, "wb");
@@ -253,11 +255,11 @@ void save(const char* fileName, int width, int height, float3* data)
     delete[] output;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     // Image Size
     int width = 512, height = 512;
-    int spp = 512;
+    int spp = argc==2 ? atoi(argv[1]) : 512;
 
     sTimer t;
     
