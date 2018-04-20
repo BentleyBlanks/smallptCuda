@@ -165,8 +165,8 @@ __global__ void render(int spp, int width, int height, float3* output)
     {
         //--! could be super sampling
         float3 d = cam.direction + cx*((.25 + x) / width - .5) + cy*((.25 + y) / height - .5);
-
-        color += radiance(Ray(cam.origin + d * 40, normalize(d)), &rs)*(1. / spp);
+        Ray tRay = Ray(cam.origin + d * 40, normalize(d));
+        color += radiance(tRay, &rs)*(1. / spp);
     }
 
     // gamma correction
