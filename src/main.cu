@@ -217,13 +217,24 @@ __global__ void render(int spp, int width, int height, float3* output)
     float3 cy = normalize(cross(cx, cam.direction)) * 0.5135f;
     float3 color = make_float3(0.0f);
 
-    for(int s = 0; s < spp; s++)
+    for (int sy = 0; sy < 2; sy++)
     {
-        //--! could be super sampling
-        float3 d = cam.direction + cx*((.25 + x) / width - .5) + cy*((.25 + y) / height - .5);
+        for (int sx = 0; sx < 2; sx++)
+        { 
+            for(int s = 0; s < spp; s++)
+            {
+                float r1 = curand_uniform(&rs);
+                float dx = r1 < 1 ? sqrtf(r1) - 1 : 1-sqrtf(2 - r1);
+                float r2 = curand_uniform(&rs);
+                float dy = r2 < 1 ? sqrtf(r2) - 1 : 1-sqrtf(2 - r2);
+                //--! super sampling
+                float3 d = cam.direction + cx*((((sx + dx + .5) / 2) + x) / width - .5) + 
+                                           cy*((((sy + dy + .5) / 2) + y) / height - .5);
 
-        Ray tRay = Ray(cam.origin + d * 140, normalize(d));
-        color += radiance(tRay, &rs) *(1.0f / spp);
+                Ray tRay = Ray(cam.origin + d * 140, normalize(d));
+                color += radiance(tRay, &rs) *(.25f / spp);
+            }
+        }
     }
 
     // output to the cache
@@ -260,7 +271,7 @@ int main(int argc, char *argv[])
 {
     // Image Size
     int width = 512, height = 512;
-    int spp = argc==2 ? atoi(argv[1]) : 512;
+    int spp = argc==2 ? atoi(argv[1])/4 : 512/4;
 
     sTimer t;
     
