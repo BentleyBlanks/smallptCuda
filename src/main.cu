@@ -51,13 +51,19 @@ __constant__ sphere spheres[] = {
     {1e5f,{1e5f + 1.0f, 40.8f, 81.6f},{0.0f, 0.0f, 0.0f},{0.75f, 0.25f, 0.25f}, DIFFUSE}, //Left 
     {1e5f,{-1e5f + 99.0f, 40.8f, 81.6f},{0.0f, 0.0f, 0.0f},{.25f, .25f, .75f}, DIFFUSE}, //Rght 
     {1e5f,{50.0f, 40.8f, 1e5f},{0.0f, 0.0f, 0.0f},{.75f, .75f, .75f}, DIFFUSE}, //Back 
-    {1e5f,{50.0f, 40.8f, -1e5f + 600.0f},{0.0f, 0.0f, 0.0f},{1.00f, 1.00f, 1.00f}, DIFFUSE}, //Frnt 
+    {1e5f,{50.0f, 40.8f, -1e5f + 170.0f},{0.0f, 0.0f, 0.0f},{0.0f, 0.0f, 0.0f}, DIFFUSE}, //Frnt 
     {1e5f,{50.0f, 1e5f, 81.6f},{0.0f, 0.0f, 0.0f},{.75f, .75f, .75f}, DIFFUSE}, //Botm 
     {1e5f,{50.0f, -1e5f + 81.6f, 81.6f},{0.0f, 0.0f, 0.0f},{.75f, .75f, .75f}, DIFFUSE}, //Top 
-    {16.5f,{27.0f, 16.5f, 47.0f},{0.0f, 0.0f, 0.0f},{1.0f, 1.0f, 1.0f}, DIFFUSE}, // small sphere 1
-    {16.5f,{73.0f, 16.5f, 78.0f},{0.0f, 0.0f, 0.0f},{1.0f, 1.0f, 1.0f}, DIFFUSE}, // small sphere 2
-    {600.0f,{50.0f, 681.6f - .77f, 81.6f},{2.0f, 1.8f, 1.6f},{0.0f, 0.0f, 0.0f}, DIFFUSE}  // Light
+    {16.5f,{27.0f, 16.5f, 47.0f},{0.0f, 0.0f, 0.0f},{1, 1, 1}, MIRROR},//Mirr
+    {16.5f,{73.0f, 16.5f, 78.0f},{0.0f, 0.0f, 0.0f},{1, 1, 1}, GLASS},//Glas
+    {600.0f,{50.0f, 681.6f-.27f, 81.6f},{12, 12, 12},{0.0f, 0.0f, 0.0f}, DIFFUSE}  // Light
 };
+
+__device__ float rgbToLuminance(const float3& rgb)
+{
+    const float YWeight[3] = {0.212671f, 0.715160f, 0.072169f};
+    return YWeight[0] * rgb.x + YWeight[1] * rgb.y + YWeight[2] * rgb.z;
+}
 
 __device__ bool intersectScene(const Ray &r, float &t, int &id)
 {
@@ -75,69 +81,120 @@ __device__ bool intersectScene(const Ray &r, float &t, int &id)
     return t < inf; // returns true if an intersection with the scene occurred, false when no hit
 }
 
+__device__ float clamp(float x) { return x < 0 ? 0 : x>1 ? 1 : x; }
+
 __device__ float gammaCorrection(float x)
 {
-    return pow(x, 1 / 2.2f);
+    return pow(clamp(x), 1 / 2.2f);
 }
 
 __device__ float3 radiance(Ray &r, curandState* rs)
 {
-    float3 accucolor = make_float3(0.0f, 0.0f, 0.0f); // accumulates ray colour with each iteration through bounce loop
-    float3 mask = make_float3(1.0f, 1.0f, 1.0f);
+    float3 L = make_float3(0.0f, 0.0f, 0.0f); // accumulates ray colour with each iteration through bounce loop
+    float3 throughput = make_float3(1.0f, 1.0f, 1.0f);
 
-    // ray bounce loop (no Russian Roulette used) 
-    for(int bounces = 0; bounces < 4; bounces++)
-    {  // iteration up to 4 bounces (replaces recursion in CPU code)
+    // ray bounce loop
+    for(int depth = 0; depth < 6; depth++)
+    {
+        float t;    
+        int id = 0;         
 
-        float t;           // distance to closest intersection 
-        int id = 0;        // index of closest intersected sphere 
-
-                           // test ray for intersection with scene
+        // find closest intersection with object's index
         if(!intersectScene(r, t, id))
-            return make_float3(0.0f, 0.0f, 0.0f); // if miss, return black
+            break;
 
-                                                  // else, we've got a hit!
-                                                  // compute hitpoint and normal
-        const sphere &obj = spheres[id];  // hitobject
-        float3 x = r.origin + r.direction*t;          // hitpoint 
-        float3 n = normalize(x - obj.center);    // normal
-        float3 nl = dot(n, r.direction) < 0 ? n : n * -1; // front facing normal
+        const sphere &obj = spheres[id];
+        float3 hitpoint = r.origin + r.direction * t; 
+        float3 normal = normalize(hitpoint - obj.center);
+        float3 nl = dot(normal, r.direction) < 0 ? normal : normal * -1; // front facing normal
 
-                                                    // add emission of current sphere to accumulated colour
-                                                    // (first term in rendering equation sum) 
-        accucolor += mask * obj.emission;
+        // prevent self-intersection
+        r.origin = hitpoint + nl * 0.05f;
 
-        // all spheres in the scene are diffuse
-        // diffuse material reflects light uniformly in all directions
-        // generate new diffuse ray:
-        // origin = hitpoint of previous ray in path
-        // random direction in hemisphere above hitpoint (see "Realistic Ray Tracing", P. Shirley)
+        //float pdf = 1.0f;
 
-        // create 2 random numbers
-        float r1 = 2 * PI * curand_uniform(rs); // pick random number on unit circle (radius = 1, circumference = 2*Pi) for azimuth
-        float r2 = curand_uniform(rs);  // pick random number for elevation
-        float r2s = sqrtf(r2);
+        // add emission
+        L += throughput * obj.emission;
 
-        // compute local orthonormal basis uvw at hitpoint to use for calculation random ray direction 
-        // first vector = normal at hitpoint, second vector is orthogonal to first, third vector is orthogonal to first two vectors
-        float3 w = nl;
-        float3 u = normalize(cross((fabs(w.x) > .1 ? make_float3(0, 1, 0) : make_float3(1, 0, 0)), w));
-        float3 v = cross(w, u);
+        // different material
+        if(obj.type == DIFFUSE)
+        {        
+            // uniform sampling hemisphere
+            float r1 = 2 * PI * curand_uniform(rs);
+            float r2 = curand_uniform(rs);
+            float r2s = sqrtf(r2);
 
-        // compute random ray direction on hemisphere using polar coordinates
-        // cosine weighted importance sampling (favours ray directions closer to normal direction)
-        float3 d = normalize(u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrtf(1 - r2));
+            // compute local coordinate on the hit point
+            float3 w = nl;
+            float3 u = normalize(cross((fabs(w.x) > .1 ? make_float3(0, 1, 0) : make_float3(1, 0, 0)), w));
+            float3 v = cross(w, u);
 
-        // new ray origin is intersection point of previous ray with scene
-        r.origin = x + nl*0.05f; // offset ray origin slightly to prevent self intersection
-        r.direction = d;
+            // local to world convert
+            r.direction = normalize(u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrtf(1 - r2));
+            //pdf = 1.0f / PI;
 
-        mask *= obj.reflectance;    // multiply with colour of object       
-        mask *= dot(d, nl);  // weigh light contribution using cosine of angle between incident light and normal
-        mask *= 2;          // fudge factor
+            // importance sampling no need costheta
+            //throughput *= obj.reflectance * dot(r.direction, nl);
+            throughput *= obj.reflectance;
+        }
+        else if(obj.type == MIRROR)
+        {
+            r.direction = r.direction - normal * 2 * dot(normal, r.direction);
+            throughput *= obj.reflectance;
+            //pdf = 1.0f;
+        }
+        else
+        {
+            r.origin = hitpoint;
+
+            // Ideal dielectric REFRACTION
+            float3 reflectDir = r.direction - normal * 2 * dot(normal, r.direction);
+            // Ray from outside going in?
+            bool into = dot(normal, nl) > 0;
+            float nc = 1, nt = 1.5, nnt = into ? nc / nt : nt / nc, ddn = dot(r.direction, nl), cos2t;
+            
+            // total internal reflection
+            if((cos2t = 1 - nnt*nnt*(1 - ddn*ddn)) < 0)
+            {
+                r.direction = reflectDir;
+                throughput *= make_float3(1, 0, 0);
+            }
+            else
+            {
+                // refract or reflect
+                float3 tdir = normalize(r.direction*nnt - normal*((into ? 1 : -1)*(ddn*nnt + sqrt(cos2t))));
+
+                float a = nt - nc, b = nt + nc, R0 = a*a / (b*b), c = 1 - (into ? -ddn : dot(tdir, normal));
+
+                float Re = R0 + (1 - R0)*c*c*c*c*c, Tr = 1 - Re, P = .25 + .5*Re, RP = Re / P, TP = Tr / (1 - P);
+                
+                if(curand_uniform(rs) < P)
+                {
+                    // reflect
+                    r.direction = reflectDir;
+                    throughput *= obj.reflectance * RP;
+                }
+                else
+                {
+                    //refract
+                    r.direction = tdir;
+                    throughput *= obj.reflectance * TP;
+                    //throughput *= make_float3(1, 0, 0);
+                }
+            }
+        }
+
+        // Russian roulette Stop with at least some probability to avoid getting stuck
+        //if(depth++ >= 5)
+        //{
+        //    float q = min(0.95f, rgbToLuminance(throughput));
+        //    if(curand_uniform(rs) >= q)
+        //        break;
+        //    throughput /= q;
+        //}
     }
 
-    return accucolor;
+    return L;
 }
 
 __global__ void render(int spp, int width, int height, float3* output)
@@ -149,8 +206,6 @@ __global__ void render(int spp, int width, int height, float3* output)
     // index of current pixel
     //int i = (blockIdx.x + blockIdx.y * gridDim.x) * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x;
     int i = (height - y - 1) * width + x;
-    unsigned int s1 = x;  // seeds for random number generator
-    unsigned int s2 = y;
 
     curandState rs;
     curand_init(i, 0, 0, &rs);
@@ -166,19 +221,18 @@ __global__ void render(int spp, int width, int height, float3* output)
         //--! could be super sampling
         float3 d = cam.direction + cx*((.25 + x) / width - .5) + cy*((.25 + y) / height - .5);
 
-        color += radiance(Ray(cam.origin + d * 40, normalize(d)), &rs)*(1. / spp);
+        color += radiance(Ray(cam.origin + d * 140, normalize(d)), &rs)*(1.0f / spp);
     }
-
-    // gamma correction
-    color.x = gammaCorrection(color.x);
-    color.y = gammaCorrection(color.y);
-    color.z = gammaCorrection(color.z);
 
     // output to the cache
     output[i] = make_float3(clamp(color.x, 0.0f, 1.0f), clamp(color.y, 0.0f, 1.0f), clamp(color.z, 0.0f, 1.0f));
 }
 
 // -----------------------------------CPU Func-----------------------------------
+int toInt(float x)
+{
+    return (int) (pow(clamp(x, 0.0f, 1.0f), 1.0f / 2.2f) * 255 + 0.5f);
+}
 void save(const char* fileName, int width, int height, float3* data)
 {
     FILE *fp = fopen(fileName, "wb");
@@ -189,9 +243,9 @@ void save(const char* fileName, int width, int height, float3* data)
     for(int i = 0; i < width * height; i++)
     {
         //printf_s("%f %f %f \n", data[i].x, data[i].y, data[i].z);
-        output[i * 3 + 0] = data[i].x * 255;
-        output[i * 3 + 1] = data[i].y * 255;
-        output[i * 3 + 2] = data[i].z * 255;
+        output[i * 3 + 0] = toInt(data[i].x);
+        output[i * 3 + 1] = toInt(data[i].y);
+        output[i * 3 + 2] = toInt(data[i].z);
     }
 
     svpng(fp, width, height, output, 0);
@@ -203,7 +257,7 @@ int main(void)
 {
     // Image Size
     int width = 512, height = 512;
-    int spp = 1024;
+    int spp = 512;
 
     sTimer t;
     
@@ -212,6 +266,7 @@ int main(void)
     float3* outputGPU;
     cudaMalloc(&outputGPU, width * height * sizeof(float3));
 
+    // Ray Pool
     dim3 blockSize(16, 16, 1);
     dim3 gridSize(width / blockSize.x, height / blockSize.y, 1);
 
