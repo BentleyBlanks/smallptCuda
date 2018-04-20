@@ -199,11 +199,11 @@ void save(const char* fileName, int width, int height, float3* data)
     delete[] output;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     // Image Size
     int width = 512, height = 512;
-    int spp = 1024;
+    int spp = argc==2 ? atoi(argv[1]) : 1024;
 
     sTimer t;
     
