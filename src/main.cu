@@ -29,6 +29,8 @@ enum materialType
 
 struct __align__(16) Ray
 {
+    __device__ Ray() {}
+
     __device__ Ray(float3 origin, float3 direction) 
         : origin(origin), direction(direction) {}
 
@@ -213,11 +215,13 @@ __global__ void render(int spp, int width, int height, float3* output)
     //copy spheres to shared memory
     __shared__ int nsp;
     __shared__ sphere sspheres[nsphere];
+    __shared__ Ray tRay;
     nsp = nsphere;
 
     sspheres[threadIdx.x % nsp] = spheres[threadIdx.x % nsp];
 
-    __syncthreads();
+    //__syncthreads();
+
     // position of current pixel
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -249,14 +253,18 @@ __global__ void render(int spp, int width, int height, float3* output)
                 float3 d = cam.direction + cx*((((sx + dx + .5) / 2) + x) / width - .5) + 
                                            cy*((((sy + dy + .5) / 2) + y) / height - .5);
 
-                Ray tRay = Ray(cam.origin + d * 140, normalize(d));
+                //Ray tRay = Ray(cam.origin + d * 140, normalize(d));
+                tRay.direction = normalize(d);
+                tRay.origin = cam.origin + d * 140;
                 color += radiance(tRay, &rs, sspheres, nsp) *(.25f / spp);
             }
         }
     }
 
     // output to the cache
-    output[i] = make_float3(clamp(color.x, 0.0f, 1.0f), clamp(color.y, 0.0f, 1.0f), clamp(color.z, 0.0f, 1.0f));
+    __shared__ float3 temp;
+    temp = make_float3(clamp(color.x, 0.0f, 1.0f), clamp(color.y, 0.0f, 1.0f), clamp(color.z, 0.0f, 1.0f));
+    output[i] = temp;
 }
 
 // -----------------------------------CPU Func-----------------------------------
@@ -305,11 +313,11 @@ int main(int argc, char *argv[])
     devicePropertyPrint();
 
     // Image Size
-    int width = 512, height = 512;
-    int spp = argc==2 ? atoi(argv[1])/4 : 512/4;
+    int width = 768, height = 768;
+    int spp = argc==2 ? atoi(argv[1])/4 : 2048/4;
 
     printf("\nRendering Size: [%d, %d], spp: %d\n", width, height, spp);
-    printf("Rendering Started\n");
+    printf("------------------Rendering Started------------------\n");
 
     sTimer t;
     
@@ -336,8 +344,7 @@ int main(int argc, char *argv[])
     // free CUDA memory
     cudaFree(outputGPU);
 
-    printf("Rendering Ended\n");
-
+    printf("------------------Rendering Ended------------------\n");
     printf("Cost time: %f\n", t.difference());
 
     save("test.png", width, height, outputCPU);
