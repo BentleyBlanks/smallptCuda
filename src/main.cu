@@ -280,7 +280,7 @@ void save(const char* fileName, int width, int height, float3* data)
 int main(int argc, char *argv[])
 {
     // Image Size
-    int width = 512, height = 512;
+    int width = 1024, height = 768;
     int spp = argc==2 ? atoi(argv[1])/4 : 512/4;
 
     sTimer t;
