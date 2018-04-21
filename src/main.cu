@@ -19,7 +19,7 @@ enum materialType
     GLASS
 };
 
-struct Ray
+struct __align__(16) Ray
 {
     __device__ Ray(float3 origin, float3 direction) 
         : origin(origin), direction(direction) {}
@@ -28,7 +28,7 @@ struct Ray
     float3 direction;
 };
 
-struct sphere
+struct __align__(16) sphere
 {
     float radius;
     float3 center, emission, reflectance;
@@ -59,19 +59,21 @@ __constant__ sphere spheres[] = {
     {600.0f,{50.0f, 681.6f-.27f, 81.6f},{12, 12, 12},{0.0f, 0.0f, 0.0f}, DIFFUSE}  // Light
 };
 
+__constant__ const int nsphere = sizeof(spheres) / sizeof(sphere);
+
 __device__ float rgbToLuminance(const float3& rgb)
 {
     const float YWeight[3] = {0.212671f, 0.715160f, 0.072169f};
     return YWeight[0] * rgb.x + YWeight[1] * rgb.y + YWeight[2] * rgb.z;
 }
 
-__device__ bool intersectScene(const Ray &r, float &t, int &id)
+__device__ bool intersectScene(const Ray &r, float &t, int &id, sphere* pshere, int &nsp)
 {
-    float n = sizeof(spheres) / sizeof(sphere), d, inf = t = 1e20;  // t is distance to closest intersection, initialise t to a huge number outside scene
-    for(int i = int(n); i--;)
+    float d, inf = t = 1e20;  // t is distance to closest intersection, initialise t to a huge number outside scene
+    for(int i = nsp; i--;)
     {
         // find closest hit object and point
-        if((d = spheres[i].intersect(r)) && d < t)
+        if((d = pshere[i].intersect(r)) && d < t)
         {
             t = d;
             id = i;
@@ -88,7 +90,7 @@ __device__ float gammaCorrection(float x)
     return pow(clamp(x), 1 / 2.2f);
 }
 
-__device__ float3 radiance(Ray &r, curandState* rs)
+__device__ float3 radiance(Ray &r, curandState* rs, sphere* pshere, int &nsp)
 {
     float3 L = make_float3(0.0f, 0.0f, 0.0f); // accumulates ray colour with each iteration through bounce loop
     float3 throughput = make_float3(1.0f, 1.0f, 1.0f);
@@ -101,10 +103,10 @@ __device__ float3 radiance(Ray &r, curandState* rs)
         int id = 0;         
 
         // find closest intersection with object's index
-        if(!intersectScene(r, t, id))
+        if(!intersectScene(r, t, id, pshere, nsp))
             break;
 
-        const sphere &obj = spheres[id];
+        const sphere &obj = pshere[id];
         float3 hitpoint = r.origin + r.direction * t; 
         float3 normal = normalize(hitpoint - obj.center);
         float3 nl = dot(normal, r.direction) < 0 ? normal : normal * -1; // front facing normal
@@ -200,6 +202,14 @@ __device__ float3 radiance(Ray &r, curandState* rs)
 
 __global__ void render(int spp, int width, int height, float3* output)
 {
+    //copy spheres to shared memory
+    __shared__ int nsp;
+    __shared__ sphere sspheres[nsphere];
+    nsp = nsphere;
+
+    sspheres[threadIdx.x % nsp] = spheres[threadIdx.x % nsp];
+
+    __syncthreads();
     // position of current pixel
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -232,7 +242,7 @@ __global__ void render(int spp, int width, int height, float3* output)
                                            cy*((((sy + dy + .5) / 2) + y) / height - .5);
 
                 Ray tRay = Ray(cam.origin + d * 140, normalize(d));
-                color += radiance(tRay, &rs) *(.25f / spp);
+                color += radiance(tRay, &rs, sspheres, nsp) *(.25f / spp);
             }
         }
     }
