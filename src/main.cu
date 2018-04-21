@@ -10,6 +10,14 @@
 
 #define PI 3.14159265359f
 
+#define CUDA_SAFE_CALL( call) {										 \
+cudaError err = call;                                                    \
+if( cudaSuccess != err) {                                                \
+    fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n",        \
+            __FILE__, __LINE__, cudaGetErrorString( err) );              \
+    getchar();                                                 \
+} }
+
 // -----------------------------------GPU Func-----------------------------------
 // From [smallpt](http://www.kevinbeason.com/smallpt/)
 enum materialType
@@ -277,18 +285,38 @@ void save(const char* fileName, int width, int height, float3* data)
     delete[] output;
 }
 
+void devicePropertyPrint()
+{
+    // Device
+    int dev = 0;
+    cudaDeviceProp devProp;
+    if(cudaGetDeviceProperties(&devProp, dev) == cudaSuccess)
+    {
+        std::cout << "Device " << dev << ", named: " << devProp.name << std::endl;
+        std::cout << "Multi Processor Count£º" << devProp.multiProcessorCount << std::endl;
+        std::cout << "Size of SharedMem Per-Block£º" << devProp.sharedMemPerBlock / 1024.0 << " KB" << std::endl;
+        std::cout << "Max Threads Per-Block£º" << devProp.maxThreadsPerBlock << std::endl;
+        std::cout << "Max Threads Per-MultiProcessor£º" << devProp.maxThreadsPerMultiProcessor << std::endl;
+    }
+}
+
 int main(int argc, char *argv[])
 {
+    devicePropertyPrint();
+
     // Image Size
     int width = 512, height = 512;
     int spp = argc==2 ? atoi(argv[1])/4 : 512/4;
+
+    printf("\nRendering Size: [%d, %d], spp: %d\n", width, height, spp);
+    printf("Rendering Started\n");
 
     sTimer t;
     
     // Memory on CPU
     float3* outputCPU = new float3[width * height];
     float3* outputGPU;
-    cudaMalloc(&outputGPU, width * height * sizeof(float3));
+    CUDA_SAFE_CALL(cudaMalloc(&outputGPU, width * height * sizeof(float3)));
 
     // Ray Pool
     dim3 blockSize(32, 32, 1);
@@ -303,10 +331,12 @@ int main(int argc, char *argv[])
     t.end();
 
     // Copy Mem from GPU to CPU
-    cudaMemcpy(outputCPU, outputGPU, width * height * sizeof(float3), cudaMemcpyDeviceToHost);
+    CUDA_SAFE_CALL(cudaMemcpy(outputCPU, outputGPU, width * height * sizeof(float3), cudaMemcpyDeviceToHost));
 
     // free CUDA memory
     cudaFree(outputGPU);
+
+    printf("Rendering Ended\n");
 
     printf("Cost time: %f\n", t.difference());
 
