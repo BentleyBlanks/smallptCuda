@@ -158,7 +158,7 @@ __device__ float3 radiance(Ray &r, curandState* rs)
             if((cos2t = 1 - nnt*nnt*(1 - ddn*ddn)) < 0)
             {
                 r.direction = reflectDir;
-                throughput *= make_float3(1, 0, 0);
+                throughput *= obj.reflectance;
             }
             else
             {
