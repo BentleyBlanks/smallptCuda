@@ -400,8 +400,11 @@ __global__ void rayStep(Ray* rays, float3* outputGPU)
         }
     }
 
-   
-    outputGPU[r.pixelIndex] += L;
+    float3& output = outputGPU[r.pixelIndex];
+    atomicAdd(&output.x, L.x);
+    atomicAdd(&output.y, L.y);
+    atomicAdd(&output.z, L.z);
+    //outputGPU[r.pixelIndex] += L;
 }
 
 __global__ void finalAverage(int width, int height, int spp, float3* output)
