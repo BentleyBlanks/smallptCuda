@@ -291,7 +291,7 @@ int main(int argc, char *argv[])
     cudaMalloc(&outputGPU, width * height * sizeof(float3));
 
     // Ray Pool
-    dim3 blockSize(16, 16, 1);
+    dim3 blockSize(32, 32, 1);
     dim3 gridSize(width / blockSize.x, height / blockSize.y, 1);
 
     t.start();
