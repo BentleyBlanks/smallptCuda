@@ -301,10 +301,10 @@ void devicePropertyPrint()
     if(cudaGetDeviceProperties(&devProp, dev) == cudaSuccess)
     {
         std::cout << "Device " << dev << ", named: " << devProp.name << std::endl;
-        std::cout << "Multi Processor Count£º" << devProp.multiProcessorCount << std::endl;
-        std::cout << "Size of SharedMem Per-Block£º" << devProp.sharedMemPerBlock / 1024.0 << " KB" << std::endl;
-        std::cout << "Max Threads Per-Block£º" << devProp.maxThreadsPerBlock << std::endl;
-        std::cout << "Max Threads Per-MultiProcessor£º" << devProp.maxThreadsPerMultiProcessor << std::endl;
+        std::cout << "Multi Processor Count: " << devProp.multiProcessorCount << std::endl;
+        std::cout << "Size of SharedMem Per-Block: " << devProp.sharedMemPerBlock / 1024.0 << " KB" << std::endl;
+        std::cout << "Max Threads Per-Block: " << devProp.maxThreadsPerBlock << std::endl;
+        std::cout << "Max Threads Per-MultiProcessor: " << devProp.maxThreadsPerMultiProcessor << std::endl;
     }
 }
 
@@ -313,7 +313,7 @@ int main(int argc, char *argv[])
     devicePropertyPrint();
 
     // Image Size
-    int width = 768, height = 768;
+    int width = 1024, height = 768;
     int spp = argc==2 ? atoi(argv[1])/4 : 2048/4;
 
     printf("\nRendering Size: [%d, %d], spp: %d\n", width, height, spp);
