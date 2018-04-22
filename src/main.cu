@@ -220,7 +220,7 @@ __global__ void render(int spp, int width, int height, float3* output)
 
     sspheres[threadIdx.x % nsp] = spheres[threadIdx.x % nsp];
 
-    //__syncthreads();
+    __syncthreads();
 
     // position of current pixel
     int x = blockIdx.x * blockDim.x + threadIdx.x;
