@@ -1,7 +1,7 @@
 # smallptCuda 
 A simple cuda version of [smallpt](http://www.kevinbeason.com/smallpt/) with some memory optimization.
 
-> See more optimization details on [Shawnlu](http://page.shawnlu.ml/) and [Bingo](http://bentleyblanks.github.io/)'s blog.
+> See more optimization details on [Shawnlu](http://page.shawnlu.ml/post/a-cuda-version-of-smallpt/) and [Bingo](http://bentleyblanks.github.io/)'s blog.
 
  ![result](test.png) 
 
@@ -21,9 +21,12 @@ A simple cuda version of [smallpt](http://www.kevinbeason.com/smallpt/) with som
  
 ## Usage 
 ### Linux 
-    $ cd src
-    $ make
-    $ ./smallpt 5000
+    $ git clone https://github.com/BentleyBlanks/smallptCuda.git 
+    $ cd smallptCuda 
+    $ git checkout release 
+    $ cd src && make 
+    $ ./smallpt 5000 
+    $ display test.png 
 ### Windows 
 Supporting Visual Studio 2015 + Cuda 9.1
 
